@@ -1,4 +1,4 @@
-# FINSIGHT_GraphRAG
+# Supply Chain Graph RAG with Neo4j Aura DB instance
 
 **A hybrid Graph RAG pipeline for semiconductor supply-chain intelligence.**
 
