@@ -1,12 +1,7 @@
-**A hybrid Graph RAG pipeline for semiconductor supply-chain intelligence.**
 
 # Supply Chain Graph RAG with Neo4j Aura DB instance
 
-SUPPLY-SIGHT combines a **knowledge graph** (Neo4j) with **vector search**
-(ChromaDB), fuses their results with **Reciprocal Rank Fusion**, and
-orchestrates the whole retrieval as a **five-agent LangGraph workflow** — so
-it can answer questions that require *tracing dependencies across multiple
-documents*, which ordinary (vector-only) RAG cannot.
+**A hybrid Graph RAG pipeline for semiconductor supply-chain intelligence.**
 
 ---
 
@@ -68,9 +63,9 @@ depends on TSMC. To answer the question you must **connect facts across four
 documents** — a chain the chatbot cannot follow, because it only retrieves
 passages that individually *look like* the question.
 
-### What FINSIGHT does about it
+### What SUPPLY-SIGHT does about it
 
-FINSIGHT stores the analysts' knowledge as a **graph of relationships** and
+SUPPLY-SIGHT stores the analysts' knowledge as a **graph of relationships** and
 answers questions by **walking the chain** — while *also* pulling supporting
 text from the documents. The result is a system that can trace a disruption
 from ASML all the way to Apple's revenue, cite the documents that support
