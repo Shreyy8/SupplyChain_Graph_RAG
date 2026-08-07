@@ -2,7 +2,7 @@
 
 **A hybrid Graph RAG pipeline for semiconductor supply-chain intelligence.**
 
-FINSIGHT combines a **knowledge graph** (Neo4j) with **vector search**
+SUPPLY-SIGHT combines a **knowledge graph** (Neo4j) with **vector search**
 (ChromaDB), fuses their results with **Reciprocal Rank Fusion**, and
 orchestrates the whole retrieval as a **five-agent LangGraph workflow** — so
 it can answer questions that require *tracing dependencies across multiple
