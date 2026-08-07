@@ -1,4 +1,3 @@
-
 # Running FINSIGHT in Docker — Every Command, Explained
 
 **From an empty terminal to a live API, one command at a time.**
@@ -14,17 +13,18 @@ volumes. This file assumes you know those four words.
 
 ## Contents
 
-| Part                                                    | What happens                          |
-| ------------------------------------------------------- | ------------------------------------- |
-| [Part 0](#part-0--check-your-setup)                      | Check Docker is actually running      |
-| [Part 1](#part-1--get-the-project-and-its-secrets)       | Get the project and its secrets ready |
-| [Part 2](#part-2--build-the-image)                       | Build the image                       |
-| [Part 3](#part-3--run-the-ingestion)                     | Run the ingestion (build the graph)   |
-| [Part 4](#part-4--start-the-api)                         | Start the API and use it              |
-| [Part 5](#part-5--look-inside-a-running-container)       | Look inside a running container       |
-| [Part 6](#part-6--stop-and-clean-up)                     | Stop and clean up                     |
-| [Part 7](#part-7--the-same-thing-with-docker-compose)    | The same thing, with Docker Compose   |
-| [Experiment](#experiment--what-happens-without-a-volume) | Watch data disappear without a volume |
+| Part                                                    | What happens                                                      |
+| ------------------------------------------------------- | ----------------------------------------------------------------- |
+| [Part 0](#part-0--check-your-setup)                      | Check Docker is actually running                                  |
+| [Part 1](#part-1--get-the-project-and-its-secrets)       | Get the project and its secrets ready                             |
+| [Part 2](#part-2--build-the-image)                       | Build the image                                                   |
+| [Part 3](#part-3--run-the-ingestion)                     | Run the ingestion (build the graph)                               |
+| [Part 4](#part-4--start-the-api)                         | Start the API and ask it real questions                           |
+| [Part 5](#part-5--look-inside-a-running-container)       | Look inside a running container                                   |
+| [Part 6](#part-6--stop-and-clean-up)                     | Stop and clean up                                                 |
+| [Part 7](#part-7--the-same-thing-with-docker-compose)    | The same thing, with Docker Compose                               |
+| [Part 8](#part-8--everyday-use-from-tomorrow-onwards)    | **Everyday use — the only command you need from tomorrow** |
+| [Experiment](#experiment--what-happens-without-a-volume) | Watch data disappear without a volume                             |
 
 ---
 
@@ -416,7 +416,9 @@ container, only your view of it.
 
 ---
 
-## 4.4 Use the API
+## 4.4 Open the interactive API page
+
+The container is running. Now you actually use it.
 
 Open this in your browser:
 
@@ -424,17 +426,40 @@ Open this in your browser:
 http://localhost:8000/docs
 ```
 
-**What it means:** FastAPI generates an interactive page listing every endpoint,
-where you can send real requests without writing any code.
+**What it means:** FastAPI automatically builds an interactive page listing every
+endpoint your API offers, with a form for each one. You can send real requests
+without writing a single line of code.
 
-**Expected output:** a page titled with your API name, listing the `/health`
-and `/query` endpoints.
+**Expected output:** a page listing the available endpoints, typically:
 
-Or test it from the terminal:
+```
+GET   /health     Health check
+POST  /query      Ask a question
+```
+
+> **Pause here for a second.** You are talking to an application that is not
+> installed on your computer. No Python environment was created for it, no
+> `pip install` was run on your machine, no libraries were added.
+>
+> It is running inside a sealed box, and your browser reaches it through one
+> deliberate hole you punched with `-p 8000:8000`.
+>
+> That is Docker, working.
+
+---
+
+## 4.5 Check the API is healthy
+
+**In the browser:** click `GET /health`, then **Try it out**, then **Execute**.
+
+**Or from the terminal:**
 
 ```bash
 curl http://localhost:8000/health
 ```
+
+**What it means:** The simplest possible request. It does not touch Neo4j,
+OpenAI or ChromaDB — it just confirms the web server is awake and answering.
 
 **Expected output:**
 
@@ -442,19 +467,164 @@ curl http://localhost:8000/health
 {"status":"ok"}
 ```
 
-> **Pause here.** You are talking to an application that is not installed on
-> your computer. There is no Python environment for it, no `pip install` was
-> run on your machine, and no libraries were added. It is running inside a
-> sealed box, and your browser reaches it through one deliberate hole you
-> punched with `-p`.
->
-> That is Docker, working.
-
-Now ask it a real question through `/docs` — try *"If ASML stops shipping EUV
-machines, which companies face the highest revenue risk?"* — and watch
-`docker logs -f finsight-api` in another terminal while it answers.
+If this works but a real query fails, you have narrowed the problem down
+enormously: the container and the port mapping are fine, and the issue is in
+the data layer — Neo4j credentials, ChromaDB, or the OpenAI key.
 
 ---
+
+## 4.6 Ask your first real question
+
+This is the moment everything has been building towards.
+
+**In the browser:**
+
+1. Click on `POST /query` to expand it
+2. Click **Try it out** — the example box becomes editable
+3. Replace the contents of the box with the JSON below
+4. Click **Execute**
+
+**What you type in (the input):**
+
+```json
+{
+  "question": "If ASML stops shipping EUV machines, which companies face the highest revenue risk?"
+}
+```
+
+> **Check the exact field name on your own `/docs` page.** FastAPI shows the
+> expected shape under **Schema** right there in the form. If your API expects
+> `query` rather than `question`, or takes extra optional fields like
+> `max_hops`, the page will tell you. Reading that schema is a genuinely useful
+> habit — it is the API documenting itself.
+
+**What happens next:** the request goes into the container, and the five agents
+run in sequence — entity extraction, graph query, vector search, reranking,
+synthesis. It takes roughly 10 to 30 seconds. That is normal; it is doing real
+work against Neo4j and OpenAI.
+
+**Expected output** — a JSON response along these lines:
+
+```json
+{
+  "question": "If ASML stops shipping EUV machines, which companies face the highest revenue risk?",
+  "answer": "ASML is the sole supplier of EUV lithography systems, which TSMC depends on for its most advanced process nodes. A halt in EUV shipments would affect TSMC first, and through TSMC it would reach Apple and Nvidia, both of which rely on TSMC for leading-edge manufacturing...",
+  "sources": [
+    "asml_technology_report_FY2023.pdf",
+    "tsmc_manufacturing_report_FY2023.pdf",
+    "global_semiconductor_supply_chain_risk_2024.pdf"
+  ],
+  "graph_paths": [
+    "ASML -[SUPPLIES]-> TSMC -[MANUFACTURES_FOR]-> Apple",
+    "ASML -[SUPPLIES]-> TSMC -[MANUFACTURES_FOR]-> Nvidia"
+  ]
+}
+```
+
+Your exact fields will depend on how the API is written, but the shape is the
+point: **an answer, plus where it came from.**
+
+> **The `graph_paths` are what make this Graph RAG rather than ordinary RAG.**
+>
+> Nowhere in your PDFs does a sentence say "ASML affects Apple". Ordinary
+> keyword or vector search would never connect them, because they are not
+> discussed together.
+>
+> The graph found it by walking two hops: ASML supplies TSMC, TSMC manufactures
+> for Apple. That is a relationship the system worked out, not one it read.
+
+---
+
+## 4.7 Watch it work while it answers
+
+Open a **second terminal** window, and before clicking Execute, run:
+
+```bash
+docker logs -f finsight-api
+```
+
+**Expected output** while a query is running:
+
+```
+finsight-api  | INFO: 172.17.0.1:52134 - "POST /query HTTP/1.1" 200 OK
+INFO | graph_rag.agents.entity_agent | Extracted entities: ['ASML', 'EUV']
+INFO | graph_rag.agents.graph_agent  | Found 7 paths within 3 hops
+INFO | graph_rag.agents.vector_agent | Retrieved 5 chunks
+INFO | graph_rag.agents.rerank_agent | Fused to 6 results
+INFO | graph_rag.agents.synthesis    | Generating answer
+```
+
+Worth doing once. Students see the five agents fire in order, which turns an
+abstract architecture diagram into something visibly happening.
+
+`Ctrl+C` stops watching. It does **not** stop the container.
+
+---
+
+## 4.8 More questions worth trying
+
+Paste these into the same `/query` box one at a time. Each one exercises a
+different part of the pipeline.
+
+**Single-hop — tests basic retrieval:**
+
+```json
+{"question": "What does ASML manufacture?"}
+```
+
+**Two-hop — tests the graph:**
+
+```json
+{"question": "Which companies depend on TSMC?"}
+```
+
+**Multi-hop reasoning — the one to demo:**
+
+```json
+{"question": "How would an earthquake in Taiwan affect Nvidia's product roadmap?"}
+```
+
+**A deliberate miss — tests honesty:**
+
+```json
+{"question": "What is Samsung's dividend policy for 2025?"}
+```
+
+That last one matters. The documents do not contain it, so a well-behaved
+system should say it does not know. If it invents a confident answer instead,
+you have found a real weakness — and that is a far more useful thing to show
+students than five successful queries in a row.
+
+---
+
+## 4.9 Querying from the terminal instead
+
+Same request, no browser:
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which companies depend on TSMC?"}'
+```
+
+**What it means, flag by flag:**
+
+| Part                                    | Meaning                                  |
+| --------------------------------------- | ---------------------------------------- |
+| `-X POST`                             | Send a POST request, not the default GET |
+| `-H "Content-Type: application/json"` | Tell the server the body is JSON         |
+| `-d '{...}'`                          | The body — the actual question          |
+
+**Expected output:** the same JSON as the browser gave you, printed as one long
+line. To make it readable:
+
+```bash
+curl -s -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which companies depend on TSMC?"}' | python3 -m json.tool
+```
+
+`-s` hides the progress bar, and `json.tool` pretty-prints the result.
 
 # Part 5 — Look inside a running container
 
@@ -881,6 +1051,216 @@ docker compose down                  # stop and remove
 
 ---
 
+# Part 8 — Everyday use, from tomorrow onwards
+
+**Everything above was the one-time setup. This part is what you actually do
+from now on.**
+
+## The short version
+
+```bash
+cd Graph_RAG_Pipeline
+
+docker run -d --name finsight-api -p 8000:8000 --env-file .env \
+  -v "$(pwd)/data:/app/data" finsight:v1
+```
+
+Then open `http://localhost:8000/docs` and ask questions.
+
+**That is it. No build. No ingestion. No waiting.**
+
+When you are done:
+
+```bash
+docker stop finsight-api
+docker rm finsight-api
+```
+
+Or with Compose, the same two things:
+
+```bash
+docker compose up -d
+docker compose down
+```
+
+---
+
+## Why you never have to ingest again
+
+Your data lives in two places, and **neither of them is inside the container**.
+
+| What                                                | Where it actually lives                                       | Survives a deleted container?                              |
+| --------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
+| The knowledge graph — 286 nodes, 253 relationships | Neo4j Aura, in the cloud                                      | Always. It was never on your machine.                      |
+| The vector index — 136 chunks                      | `data/chroma_db` on your laptop, reached through the volume | Yes, because the volume writes through to your real folder |
+| The application code                                | Inside the image                                              | Rebuilt from the Dockerfile any time you like              |
+
+The container is disposable. The data is not. That separation is the entire
+design, and it is why the `-v` flag is not optional in the everyday command —
+it is what lets a brand-new container find the index that an older, long-deleted
+one built.
+
+> ### The number that makes this concrete
+>
+> That ingestion made roughly 136 calls to GPT-4o for entity extraction, plus a
+> further round of embedding calls. It cost real money and took about half an
+> hour.
+>
+> Repeating that every time you started the app would be absurd. Volumes exist
+> precisely so that expensive work is done once and kept, while the cheap,
+> repeatable part — starting the app — happens as often as you like.
+
+---
+
+## So when DO I need to re-run something?
+
+Use this table. It answers almost every "do I need to rebuild?" question.
+
+| What changed                              | Rebuild the image? | Re-run ingestion? | What to run                          |
+| ----------------------------------------- | ------------------ | ----------------- | ------------------------------------ |
+| Nothing — new day, same project          | No                 | No                | Just the run command above           |
+| You edited the API or agent**code** | **Yes**      | No                | `docker build` then `docker run` |
+| You added or changed a**PDF**       | No                 | **Yes**     | Ingestion with`--clear`            |
+| You edited`requirements.txt`            | **Yes**      | No                | `docker build` then `docker run` |
+| You changed a value in`.env`            | No                 | No                | Just restart the container           |
+| You deleted`data/chroma_db`             | No                 | **Yes**     | Ingestion                            |
+| Your Aura instance expired or was deleted | No                 | **Yes**     | New instance, update`.env`, ingest |
+| You want a completely fresh start         | Yes                | Yes               | See the full reset below             |
+
+Two of those are worth calling out.
+
+**Code changes need a rebuild.** Your code was copied into the image with
+`COPY . .`. Editing the file on your laptop does not change the copy sitting
+inside the image. This catches everyone at least once.
+
+**`.env` changes do not need a rebuild.** The `.env` file is never inside the
+image — `.dockerignore` keeps it out, and `--env-file` reads it fresh from your
+machine every time a container starts. So just stop, remove, and start again.
+
+---
+
+## Common everyday commands
+
+**Restart after changing `.env`:**
+
+```bash
+docker stop finsight-api && docker rm finsight-api
+docker run -d --name finsight-api -p 8000:8000 --env-file .env \
+  -v "$(pwd)/data:/app/data" finsight:v1
+```
+
+**Restart after changing code:**
+
+```bash
+docker stop finsight-api && docker rm finsight-api
+docker build -t finsight:v1 .
+docker run -d --name finsight-api -p 8000:8000 --env-file .env \
+  -v "$(pwd)/data:/app/data" finsight:v1
+```
+
+The rebuild is fast — layer caching means only the `COPY . .` step actually
+re-runs.
+
+**Re-ingest after adding a new PDF:**
+
+```bash
+docker run --rm --env-file .env -v "$(pwd)/data:/app/data" \
+  finsight:v1 python scripts/run_ingestion.py --clear
+```
+
+`--clear` wipes the existing graph first, so you do not end up with duplicate
+nodes from two ingestion runs.
+
+---
+
+## Checking things are still healthy
+
+Run these any time something feels off. Each one isolates a different layer.
+
+**Is the container running?**
+
+```bash
+docker ps
+```
+
+`Up` in the STATUS column. If it says `Exited`, read `docker logs finsight-api`.
+
+**Is the web server answering?**
+
+```bash
+curl http://localhost:8000/health
+```
+
+Should give `{"status":"ok"}`.
+
+**Is Neo4j still reachable, and does it still have the graph?**
+
+```bash
+python3 -c "
+import os
+from dotenv import load_dotenv
+from neo4j import GraphDatabase
+load_dotenv()
+d = GraphDatabase.driver(os.getenv('NEO4J_URI'), auth=(os.getenv('NEO4J_USERNAME'), os.getenv('NEO4J_PASSWORD')))
+d.verify_connectivity()
+with d.session() as s:
+    n = s.run('MATCH (n) RETURN count(n) AS c').single()['c']
+    r = s.run('MATCH ()-[r]->() RETURN count(r) AS c').single()['c']
+print(f'Connected. Nodes: {n}  Relationships: {r}')
+d.close()
+"
+```
+
+Expect roughly 286 and 253. If it connects but shows zero, the graph was
+cleared and you need to re-ingest — a genuinely useful distinction, because a
+missing graph and a broken connection produce very similar symptoms from the
+application side.
+
+**Is the vector index still on disk?**
+
+```bash
+ls data/chroma_db
+```
+
+Expect `chroma.sqlite3` and at least one folder with a long random name.
+
+> **A note on your Aura free instance.** Free instances pause after a few days
+> of inactivity, and trial instances expire. If queries suddenly start failing
+> after a gap of a week, check the Aura console first — the instance is the
+> most likely culprit, not your container.
+
+---
+
+## The full reset, if you ever want to start from scratch
+
+```bash
+# 1. Remove the running container
+docker stop finsight-api 2>/dev/null; docker rm finsight-api 2>/dev/null
+
+# 2. Delete the image
+docker rmi finsight:v1
+
+# 3. Delete the local vector index
+rm -rf data/chroma_db
+
+# 4. Rebuild from nothing, ignoring the cache
+docker build --no-cache -t finsight:v1 .
+
+# 5. Ingest into a clean graph
+docker run --rm --env-file .env -v "$(pwd)/data:/app/data" \
+  finsight:v1 python scripts/run_ingestion.py --clear
+
+# 6. Start the API
+docker run -d --name finsight-api -p 8000:8000 --env-file .env \
+  -v "$(pwd)/data:/app/data" finsight:v1
+```
+
+Roughly forty minutes, most of it step 5. Only worth doing when you genuinely
+want to prove the whole thing works end to end from nothing — which is exactly
+what you would do the day before a demo.
+
+---
+
 # Experiment — What happens without a volume
 
 Do this once. It teaches volumes better than any explanation.
@@ -949,30 +1329,64 @@ docker rm temp-test
 
 # Quick reference
 
+## Every day — the only command you need
+
 ```bash
-# BUILD
-docker build -t finsight:v1 .
-
-# INGEST (once)
-docker run --rm --env-file .env -v "$(pwd)/data:/app/data" \
-  finsight:v1 python scripts/run_ingestion.py
-
-# SERVE
 docker run -d --name finsight-api -p 8000:8000 --env-file .env \
   -v "$(pwd)/data:/app/data" finsight:v1
+```
 
-# INSPECT
+Then `http://localhost:8000/docs`. Stop with `docker stop finsight-api && docker rm finsight-api`.
+
+## One-time setup
+
+```bash
+docker build -t finsight:v1 .
+
+docker run --rm --env-file .env -v "$(pwd)/data:/app/data" \
+  finsight:v1 python scripts/run_ingestion.py
+```
+
+## Asking a question from the terminal
+
+```bash
+curl -s -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which companies depend on TSMC?"}' | python3 -m json.tool
+```
+
+## Inspecting
+
+```bash
 docker ps                          # what is running
-docker logs -f finsight-api        # what is it saying
+docker logs -f finsight-api        # watch it work
 docker exec -it finsight-api bash  # go inside
+curl http://localhost:8000/health  # is the API awake
+ls data/chroma_db                  # is the vector index still there
+```
 
-# STOP
-docker stop finsight-api
-docker rm finsight-api
+## After a change
 
-# OR, WITH COMPOSE
-docker compose up -d
-docker compose down
+```bash
+# changed .env       -> restart only
+docker stop finsight-api && docker rm finsight-api && docker run -d --name finsight-api \
+  -p 8000:8000 --env-file .env -v "$(pwd)/data:/app/data" finsight:v1
+
+# changed code       -> rebuild, then restart
+docker build -t finsight:v1 .
+
+# changed the PDFs   -> re-ingest
+docker run --rm --env-file .env -v "$(pwd)/data:/app/data" \
+  finsight:v1 python scripts/run_ingestion.py --clear
+```
+
+## With Compose
+
+```bash
+docker compose up -d               # start
+docker compose logs -f api         # watch
+docker compose down                # stop and remove
+docker compose run --rm api python scripts/run_ingestion.py --clear
 ```
 
 ---
