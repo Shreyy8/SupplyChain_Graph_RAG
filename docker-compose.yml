@@ -1,0 +1,134 @@
+# ==============================================================================
+# SUPPLY SIGHT Graph RAG - docker-compose.yml
+# ==============================================================================
+#
+#  WHAT THIS FILE IS
+#
+#  Nothing runs inside this file. There is no code here. It is a settings
+#  sheet - a written-down version of the long "docker run" command you would
+#  otherwise have to type and remember.
+#
+#  Compare. Without Compose:
+#
+#      docker run -d --name finsight-api -p 8000:8000 --env-file .env \
+#        -v "$(pwd)/data:/app/data" finsight:v1
+#
+#  With Compose:
+#
+#      docker compose up -d
+#
+#  Same result. The flags did not disappear - they moved into this file, where
+#  they get committed to the repository so everyone on the team runs the
+#  project identically.
+#
+#  WHY BOTHER FOR ONE CONTAINER
+#
+#  Honestly, for a single container it is a convenience rather than a
+#  necessity. Compose earns its keep when a project needs several containers
+#  running together - an app, a database, a cache - started with one command.
+#
+#  This project only needs one container, because Neo4j lives in the cloud on
+#  Aura and is not something we run ourselves. So treat this file as the tidy
+#  version of a command you already understand.
+#
+#  HOW TO USE IT
+#
+#      docker compose up -d       start
+#      docker compose down        stop and remove
+#
+#  Full instructions are in docker_run.md, Part 7.
+#
+# ==============================================================================
+
+
+# "services" lists the containers this project needs. We have exactly one.
+services:
+
+  # The name of our service. This is how you refer to it in commands:
+  #     docker compose logs api
+  #     docker compose exec api bash
+  # Call it whatever you like - "api" describes what it does.
+  api:
+
+    # Where to get the image.
+    #
+    # "build: ." means: there is a Dockerfile in this folder, use it.
+    # The dot is the build context, exactly as in "docker build .".
+    #
+    # If you wanted to use an already-built image from a registry instead, you
+    # would replace this line with just the image name and no build step.
+    build: .
+
+    # What to name the image Compose builds.
+    # Equivalent to the -t flag: docker build -t finsight:v1 .
+    image: finsight:v1
+
+    # What to name the running container.
+    # Equivalent to: --name finsight-api
+    #
+    # Without this, Compose invents a name like "supplychain-graph-rag-api-1".
+    # Naming it makes the commands in docker_run.md work unchanged.
+    container_name: finsight-api
+
+    # Connect a port on your machine to a port in the container.
+    # Equivalent to: -p 8000:8000
+    #
+    # Read as "my port : its port". The quotes are there because YAML would
+    # otherwise try to interpret 8000:8000 as a time value.
+    #
+    # If port 8000 is already busy on your machine, change the LEFT number
+    # only - "8001:8000" - and visit localhost:8001.
+    ports:
+      - "8000:8000"
+
+    # Read the secrets from .env and hand them to the container.
+    # Equivalent to: --env-file .env
+    #
+    # The .env file itself is never inside the image - .dockerignore keeps it
+    # out. It is read from your machine every time a container starts.
+    env_file:
+      - .env
+
+    # Connect your real data folder to the one inside the container.
+    # Equivalent to: -v "$(pwd)/data:/app/data"
+    #
+    # This is what makes the ChromaDB index survive after a container stops.
+    # Without it, every ingestion would be lost the moment the container ends.
+    #
+    # Note Compose handles the "current folder" part for you - no $(pwd)
+    # needed, and this line works identically on Mac, Linux and Windows.
+    volumes:
+      - ./data:/app/data
+
+    # Restart the container automatically if it crashes, or when Docker
+    # Desktop starts up - but NOT if you deliberately stopped it yourself.
+    #
+    # Comment this line out while learning, so a crash stays visible instead of
+    # the container quietly restarting behind your back.
+    restart: unless-stopped
+
+
+# ------------------------------------------------------------------------------
+# WHAT IS DELIBERATELY NOT HERE
+# ------------------------------------------------------------------------------
+#
+# NO NEO4J SERVICE.
+# This project uses Neo4j Aura, which runs in the cloud. The container reaches
+# it over the internet using the credentials in .env, exactly as your laptop
+# does. Nothing to run locally.
+#
+# If you ever wanted a local Neo4j instead, you would add a second service
+# here and the two containers would talk to each other by service name. That
+# is the point at which Compose stops being a convenience and starts being
+# genuinely necessary - but it is a different lesson, and it would mean
+# re-ingesting all your data into the new database.
+#
+# NO INGESTION SERVICE.
+# Ingestion is a one-off job, not something that runs continuously, so it does
+# not belong in "services". Run it through this same service instead:
+#
+#     docker compose run --rm api python scripts/run_ingestion.py
+#
+# NO "version:" LINE AT THE TOP.
+# Older tutorials start with version: "3.8". Modern Docker Compose ignores it
+# and warns that it is obsolete. If you see it in an old example, leave it out.

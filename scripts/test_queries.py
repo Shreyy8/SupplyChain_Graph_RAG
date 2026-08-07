@@ -52,6 +52,7 @@ DEMO_QUESTIONS = [
             "which companies face the highest revenue risk and why? "
             "Trace the complete impact chain."
         ),
+        # why_graph_rag — a note to a human explaining what makes this question hard for standard RAG
         "why_graph_rag": (
             "Requires 4-hop traversal: ASML -> TSMC -> Apple/Nvidia -> Revenue. "
             "No single document contains this complete chain."

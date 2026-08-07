@@ -1,0 +1,57 @@
+# ==============================================================================
+#  .dockerignore
+# ==============================================================================
+#  Docker reads this file BEFORE it copies anything into the image.
+#  Everything listed here is skipped by "COPY . ." in the Dockerfile.
+#
+#  This is the same idea as .gitignore, and it matters for the same reason:
+#  some things must never leave your machine.
+# ==============================================================================
+
+
+# --- SECRETS. Never let these into an image. -----------------------------------
+# The .env file holds your OpenAI key and your Neo4j Aura password. Anyone who
+# gets the image would get both. They are handed in at run time with
+# --env-file instead.
+.env
+.env.*
+!.env.example
+
+
+# --- DATA THAT SHOULD BE BUILT, NOT SHIPPED -----------------------------------
+# ChromaDB creates this when ingestion runs. It can be large, it is specific to
+# your machine, and it is kept alive by a volume rather than baked into the
+# image. Note we do NOT ignore data/pdfs - the source documents are part of the
+# project and belong in the image.
+data/chroma_db/
+
+
+# --- PYTHON JUNK ---------------------------------------------------------------
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+env/
+
+
+# --- VERSION CONTROL AND EDITOR FILES -----------------------------------------
+# .git can be hundreds of megabytes of history the application never reads.
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+
+# --- DOCKER'S OWN FILES --------------------------------------------------------
+# No reason to ship the recipe inside the finished dish.
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+
+# --- DOCUMENTATION -------------------------------------------------------------
+# Useful in the repository, dead weight in a running container.
+*.md
