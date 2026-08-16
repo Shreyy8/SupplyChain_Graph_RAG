@@ -1,4 +1,13 @@
 .env
+chroma_db/
 data/chroma_db/
+*.zip
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+.pytest_cache/
+.DS_Store
